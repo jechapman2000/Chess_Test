@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess Notation Practice</title>
+  <script src="chess.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #c9b370;
+    }
+
+    /* ── Board ───────────────────────────── */
+
+    .board-wrap {
+      position: relative;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .coords-file {
+      display: grid;
+      grid-template-columns: repeat(8, 64px);
+      gap: 0;
+      margin-left: 20px;
+    }
+
+    .coords-rank {
+      display: flex;
+      flex-direction: column;
+      height: 512px;
+    }
+
+    .coord {
+      font-size: 0.65rem;
+      color: #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .coords-rank .coord { height: 64px; }
+    .coords-file .coord { width: 64px; text-align: center; padding-top: 2px; }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 64px);
+      grid-template-rows: repeat(8, 64px);
+      border: 2px solid #4a3728;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    .square {
+      width: 64px;
+      height: 64px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      transition: background 0.1s;
+    }
+
+    .square.light { background: #ffffff; }
+    .square.dark  { background: #555555; }
+
+    .square.selected     { background: #7fc97a !important; }
+    .square.legal-target { background: #aed66a !important; cursor: pointer; }
+    .square.last-from    { background: #cdd63a !important; }
+    .square.last-to      { background: #cdd63a !important; }
+
+    .piece {
+      font-size: 42px;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.1s;
+    }
+
+    .piece.white {
+      color: #ffffff;
+      -webkit-text-stroke: 1.5px #000000;
+      paint-order: stroke fill;
+    }
+
+    .piece.white.on-light {
+      color: #f0f0f0;
+      -webkit-text-stroke: 4px #000000;
+    }
+
+    .piece.black {
+      color: #000000;
+      -webkit-text-stroke: 1.5px #ffffff;
+      paint-order: stroke fill;
+    }
+
+    .piece.black.on-dark {
+      -webkit-text-stroke: 2.5px #ffffff;
+    }
+
+    .piece:hover { transform: scale(1.1); }
+
+    .piece.tipped {
+      transform-origin: bottom center;
+      animation: king-tip 0.6s ease forwards;
+    }
+
+    @keyframes king-tip {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(90deg); }
+    }
+
+    /* ── Speech Bubble ───────────────────── */
+
+    .bubble {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      color: #222;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+      animation: bubble-pop 2.4s ease forwards;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .bubble.correct {
+      background: #4caf50;
+      color: white;
+    }
+
+    .bubble::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: white;
+    }
+
+    .bubble.correct::after {
+      border-top-color: #4caf50;
+    }
+
+    @keyframes bubble-pop {
+      0%   { opacity: 0; transform: translateX(-50%) scale(0.6) translateY(6px); }
+      15%  { opacity: 1; transform: translateX(-50%) scale(1)   translateY(0);   }
+      70%  { opacity: 1; transform: translateX(-50%) scale(1)   translateY(0);   }
+      100% { opacity: 0; transform: translateX(-50%) scale(0.9) translateY(-8px); }
+    }
+
+    /* ── Controls ────────────────────────── */
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      background: #4a3728;
+      color: #f0d9b5;
+      border: 1px solid #6b5040;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover  { background: #6b5040; }
+    button:active { background: #3a2718; }
+    button:disabled { opacity: 0.4; cursor: default; }
+
+    button.primary {
+      background: #2a5a3a;
+      border-color: #4a8a5a;
+      color: #c9f0d9;
+    }
+    button.primary:hover { background: #3a7a4a; }
+
+    .mode-label {
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    /* ── Panels ──────────────────────────── */
+
+    .panel {
+      width: 100%;
+      max-width: 560px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .panel-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    select {
+      background: #0f1729;
+      color: #c9d3e8;
+      border: 1px solid #2a3a5e;
+      border-radius: 5px;
+      padding: 8px;
+      font-size: 0.9rem;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    select:focus { outline: none; border-color: #c9b370; }
+
+    #pgn-status {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+
+    /* ── Practice decision panel ─────────── */
+
+    #decision-panel {
+      border-color: #5a4a2e;
+      background: #1e1a0e;
+    }
+
+    #decision-text {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: #f0d9b5;
+    }
+
+    #decision-text .game-move {
+      font-weight: 700;
+      color: #c9b370;
+      font-size: 1.1rem;
+    }
+
+    /* ── Practice status bar ─────────────── */
+
+    /* ── Game layout (board + sidebar) ──── */
+
+    .game-area {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .sidebar {
+      width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #practice-status {
+      font-size: 0.9rem;
+      color: #aaa;
+      padding: 10px 14px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 8px;
+    }
+
+    #practice-status .turn-indicator {
+      font-weight: 600;
+      color: #c9b370;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    /* ── Move History ────────────────────── */
+
+    .history label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .move-list {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #c9d3e8;
+      line-height: 1.8;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .move-list .current-move {
+      background: #c9b370;
+      color: #1a1a2e;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chess Notation Practice</h1>
+
+  <div class="game-area">
+    <div class="board-wrap">
+      <div class="coords-rank" id="rank-labels"></div>
+      <div>
+        <div id="board"></div>
+        <div class="coords-file" id="file-labels"></div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <!-- Practice status -->
+      <div id="practice-status" style="display:none"></div>
+
+      <!-- Decision panel -->
+      <div class="panel" id="decision-panel" style="display:none">
+        <div id="decision-text"></div>
+        <div class="panel-row">
+          <button id="btn-use-game" class="primary">Use game move</button>
+          <button id="btn-keep">Keep my move</button>
+        </div>
+      </div>
+
+      <!-- Move history -->
+      <div class="panel history">
+        <label>Move History</label>
+        <div class="move-list" id="move-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Playback controls (watch mode) -->
+  <div class="controls" id="watch-controls">
+    <button id="btn-reset">New Game</button>
+    <span class="mode-label">Auto-play:</span>
+    <button id="btn-prev" disabled>◀ Prev</button>
+    <button id="btn-next" disabled>Next ▶</button>
+    <button id="btn-auto" disabled>▶ Play</button>
+    <span class="mode-label">Speed:</span>
+    <input type="range" id="speed-slider" min="200" max="3000" value="1500" step="100" style="width:100px; accent-color:#c9b370;">
+    <span id="speed-label" class="mode-label">1.5s</span>
+  </div>
+
+  <!-- Game selection -->
+  <div class="panel">
+    <label>Select a Game</label>
+    <select id="game-select">
+      <option value="">— choose a game —</option>
+      <option value="scholars">Scholar's Mate — quickest checkmate (4 moves)</option>
+      <option value="legals">Legal's Mate — queen sacrifice trap (7 moves)</option>
+      <option value="opera">The Opera Game — Morphy 1858, master class in development (17 moves)</option>
+      <option value="immortal">The Immortal Game — Anderssen 1851, incredible sacrifices (23 moves)</option>
+    </select>
+    <div class="panel-row">
+      <span id="pgn-status"></span>
+    </div>
+  </div>
+
+  <!-- Practice mode: color picker (shown after game is loaded) -->
+  <div class="panel" id="practice-panel" style="display:none">
+    <label>Practice Mode — play through the game yourself</label>
+    <div class="panel-row">
+      <button id="btn-play-white" class="primary">Play as White</button>
+      <button id="btn-play-black" class="primary">Play as Black</button>
+      <button id="btn-stop-practice" style="display:none">Stop Practice</button>
+    </div>
+  </div>
+
+
+  <script>
+    // ── State ─────────────────────────────────────────────────────────────
+    let chess = new Chess();
+    let selected = null;
+    let legalTargets = [];
+    let lastMove = null;
+    let pgnMoves = [];       // reference game moves (SAN strings)
+    let pgnIndex = 0;
+    let autoTimer = null;
+
+    // Practice mode state
+    let practiceMode = false;
+    let userColor = 'w';
+    let waitingForDecision = false;
+    let pendingUserMoveSan = null;   // what the user just played (if wrong)
+    let pendingGameMoveSan = null;   // what the game played at that position
+
+    const FILES = ['a','b','c','d','e','f','g','h'];
+    const RANKS = ['8','7','6','5','4','3','2','1'];
+
+    const PIECES = {
+      wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+      bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟',
+    };
+
+    // ── Build board DOM ───────────────────────────────────────────────────
+    function buildBoard() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+
+      const rankLabels = document.getElementById('rank-labels');
+      rankLabels.innerHTML = '';
+      RANKS.forEach(r => {
+        const el = document.createElement('div');
+        el.className = 'coord';
+        el.textContent = r;
+        rankLabels.appendChild(el);
+      });
+
+      const fileLabels = document.getElementById('file-labels');
+      fileLabels.innerHTML = '';
+      FILES.forEach(f => {
+        const el = document.createElement('div');
+        el.className = 'coord';
+        el.textContent = f;
+        fileLabels.appendChild(el);
+      });
+
+      RANKS.forEach(rank => {
+        FILES.forEach(file => {
+          const sq = file + rank;
+          const isLight = (FILES.indexOf(file) + RANKS.indexOf(rank)) % 2 === 1;
+          const div = document.createElement('div');
+          div.className = 'square ' + (isLight ? 'light' : 'dark');
+          div.dataset.square = sq;
+          div.addEventListener('click', () => onSquareClick(sq));
+          board.appendChild(div);
+        });
+      });
+    }
+
+    // ── Render pieces ─────────────────────────────────────────────────────
+    function renderBoard() {
+      const boardArr = chess.board();
+
+      RANKS.forEach((rank, ri) => {
+        FILES.forEach((file, fi) => {
+          const sq = file + rank;
+          const div = document.querySelector(`[data-square="${sq}"]`);
+          if (!div) return;
+
+          const isLight = (fi + ri) % 2 === 1;
+          div.className = 'square ' + (isLight ? 'light' : 'dark');
+
+          if (lastMove) {
+            if (sq === lastMove.from || sq === lastMove.to) {
+              div.className = 'square ' + (isLight ? 'light' : 'dark') + ' last-' + (sq === lastMove.from ? 'from' : 'to');
+            }
+          }
+
+          if (sq === selected) div.classList.add('selected');
+          if (legalTargets.includes(sq)) div.classList.add('legal-target');
+
+          const existing = div.querySelector('.piece');
+          if (existing) existing.remove();
+
+          const piece = boardArr[ri][fi];
+          if (piece) {
+            const key = piece.color + piece.type.toUpperCase();
+            const span = document.createElement('span');
+            const onDark = (fi + ri) % 2 !== 1;
+            const squareClass = onDark ? 'on-dark' : 'on-light';
+            span.className = 'piece ' + (piece.color === 'w' ? 'white' : 'black') + ' ' + squareClass;
+            if (chess.in_checkmate() && piece.type === 'k' && piece.color === chess.turn()) {
+              span.classList.add('tipped');
+            }
+            span.textContent = PIECES[key] || '?';
+            div.appendChild(span);
+          }
+        });
+      });
+    }
+
+    // ── Speech bubble ─────────────────────────────────────────────────────
+    function showBubble(square, text, correct) {
+      const div = document.querySelector(`[data-square="${square}"]`);
+      if (!div) return;
+
+      const old = div.querySelector('.bubble');
+      if (old) old.remove();
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble' + (correct ? ' correct' : '');
+      bubble.textContent = text;
+      div.appendChild(bubble);
+
+      bubble.addEventListener('animationend', () => bubble.remove());
+    }
+
+    // ── Move history display ──────────────────────────────────────────────
+    function renderHistory() {
+      const history = chess.history();
+      const list = document.getElementById('move-list');
+      if (history.length === 0) { list.textContent = '—'; return; }
+
+      let html = '';
+      for (let i = 0; i < history.length; i++) {
+        const moveNum = Math.floor(i / 2) + 1;
+        const isWhite = i % 2 === 0;
+        const isCurrent = i === history.length - 1;
+        const cls = isCurrent ? ' class="current-move"' : '';
+        if (isWhite) html += `<span style="color:#888">${moveNum}.</span> `;
+        html += `<span${cls}>${history[i]}</span> `;
+      }
+      list.innerHTML = html;
+      list.scrollLeft = list.scrollWidth;
+    }
+
+    // ── Practice status bar ───────────────────────────────────────────────
+    function updatePracticeStatus() {
+      const el = document.getElementById('practice-status');
+      if (!practiceMode) { el.style.display = 'none'; return; }
+
+      el.style.display = 'block';
+      if (chess.in_checkmate()) {
+        el.innerHTML = 'Checkmate!';
+        return;
+      }
+      if (chess.game_over()) {
+        el.innerHTML = 'Game over.';
+        return;
+      }
+      const isYourTurn = chess.turn() === userColor;
+      const colorName = userColor === 'w' ? 'White' : 'Black';
+      el.innerHTML = isYourTurn
+        ? `<span class="turn-indicator">Your turn (${colorName})</span> — make your move`
+        : `Opponent is thinking…`;
+    }
+
+    // ── Click handling ────────────────────────────────────────────────────
+    function onSquareClick(sq) {
+      if (practiceMode) {
+        if (waitingForDecision) return;
+        if (chess.turn() !== userColor) return;
+        handlePracticeClick(sq);
+        return;
+      }
+
+      // Watch mode: no manual moves when a game is loaded
+      if (pgnMoves.length > 0) return;
+
+      // Free play
+      const piece = chess.get(sq);
+      if (selected) {
+        if (legalTargets.includes(sq)) {
+          const move = chess.move({ from: selected, to: sq, promotion: 'q' });
+          if (move) {
+            lastMove = { from: move.from, to: move.to };
+            selected = null;
+            legalTargets = [];
+            renderBoard();
+            renderHistory();
+            showBubble(move.to, move.san);
+          }
+        } else {
+          if (piece && piece.color === chess.turn()) {
+            selectSquare(sq);
+          } else {
+            selected = null;
+            legalTargets = [];
+            renderBoard();
+          }
+        }
+      } else {
+        if (piece && piece.color === chess.turn()) {
+          selectSquare(sq);
+        }
+      }
+    }
+
+    function handlePracticeClick(sq) {
+      const piece = chess.get(sq);
+
+      if (selected) {
+        if (legalTargets.includes(sq)) {
+          const move = chess.move({ from: selected, to: sq, promotion: 'q' });
+          if (move) {
+            lastMove = { from: move.from, to: move.to };
+            selected = null;
+            legalTargets = [];
+            renderBoard();
+            renderHistory();
+            evaluatePracticeMove(move);
+          }
+        } else {
+          if (piece && piece.color === chess.turn()) {
+            selectSquare(sq);
+          } else {
+            selected = null;
+            legalTargets = [];
+            renderBoard();
+          }
+        }
+      } else {
+        if (piece && piece.color === chess.turn()) {
+          selectSquare(sq);
+        }
+      }
+    }
+
+    function evaluatePracticeMove(move) {
+      const gameMove = pgnMoves[pgnIndex]; // what the reference game played here
+      pgnIndex++;
+
+      if (move.san === gameMove) {
+        // Correct!
+        showBubble(move.to, '✓ ' + move.san, true);
+        updatePracticeStatus();
+        if (!chess.game_over()) {
+          setTimeout(computerMove, 900);
+        }
+      } else {
+        // Different from game — ask user what to do
+        pendingUserMoveSan = move.san;
+        pendingGameMoveSan = gameMove;
+        showBubble(move.to, move.san);
+        showDecisionPanel(move.san, gameMove);
+      }
+    }
+
+    // ── Computer move (opponent in practice mode) ─────────────────────────
+    function computerMove() {
+      if (!practiceMode) return;
+      if (pgnIndex >= pgnMoves.length) return;
+      if (chess.game_over()) return;
+
+      const move = chess.move(pgnMoves[pgnIndex]);
+      if (move) {
+        pgnIndex++;
+        lastMove = { from: move.from, to: move.to };
+        renderBoard();
+        renderHistory();
+        showBubble(move.to, move.san);
+        updatePracticeStatus();
+      }
+    }
+
+    // ── Decision panel ────────────────────────────────────────────────────
+    function showDecisionPanel(userSan, gameSan) {
+      waitingForDecision = true;
+      document.getElementById('decision-text').innerHTML =
+        `You played <strong>${userSan}</strong>. The game played <span class="game-move">${gameSan}</span>.<br>What would you like to do?`;
+      document.getElementById('decision-panel').style.display = 'flex';
+      updatePracticeStatus();
+    }
+
+    function hideDecisionPanel() {
+      waitingForDecision = false;
+      document.getElementById('decision-panel').style.display = 'none';
+    }
+
+    document.getElementById('btn-use-game').addEventListener('click', () => {
+      // Undo user's move, apply the game move instead
+      chess.undo();
+      pgnIndex--;
+      const move = chess.move(pgnMoves[pgnIndex]);
+      if (move) {
+        pgnIndex++;
+        lastMove = { from: move.from, to: move.to };
+        renderBoard();
+        renderHistory();
+        showBubble(move.to, move.san, true);
+      }
+      hideDecisionPanel();
+      updatePracticeStatus();
+      if (!chess.game_over()) {
+        setTimeout(computerMove, 900);
+      }
+    });
+
+    document.getElementById('btn-keep').addEventListener('click', () => {
+      // Keep their move — stay on the game path but note the deviation
+      hideDecisionPanel();
+      updatePracticeStatus();
+      // Computer still plays the next game move if it's legal
+      if (!chess.game_over()) {
+        setTimeout(computerMove, 900);
+      }
+    });
+
+    function selectSquare(sq) {
+      selected = sq;
+      legalTargets = chess.moves({ square: sq, verbose: true }).map(m => m.to);
+      renderBoard();
+    }
+
+    // ── Games library ─────────────────────────────────────────────────────
+    const GAMES = {
+      scholars: '1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#',
+      legals:   '1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 g6 5. Nxe5 Bxd1 6. Bxf7+ Ke7 7. Nd5#',
+      opera:    '1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#',
+      immortal: '1. e4 e5 2. f4 exf4 3. Bc4 Qh4+ 4. Kf1 b5 5. Bxb5 Nf6 6. Nf3 Qh6 7. d3 Nh5 8. Nh4 Qg5 9. Nf5 c6 10. g4 Nf6 11. Rg1 cxb5 12. h4 Qg6 13. h5 Qg5 14. Qf3 Ng8 15. Bxf4 Qf6 16. Nc3 Bc5 17. Nd5 Qxb2 18. Bd6 Bxg1 19. e5 Qxa1+ 20. Ke2 Na6 21. Nxg7+ Kd8 22. Qf6+ Nxf6 23. Be7#',
+    };
+
+    // ── Load PGN ──────────────────────────────────────────────────────────
+    function loadPgn(pgn) {
+      const status = document.getElementById('pgn-status');
+      const test = new Chess();
+      if (!test.load_pgn(pgn)) {
+        status.textContent = 'Invalid PGN';
+        return;
+      }
+      stopAuto();
+      stopPractice();
+      pgnMoves = test.history();
+      pgnIndex = 0;
+      chess = new Chess();
+      lastMove = null;
+      selected = null;
+      legalTargets = [];
+      status.textContent = `${pgnMoves.length} moves loaded`;
+      renderBoard();
+      renderHistory();
+      updateAutoPlayButtons();
+      document.getElementById('practice-panel').style.display = 'flex';
+      document.getElementById('btn-play-white').style.display = '';
+      document.getElementById('btn-play-black').style.display = '';
+      document.getElementById('btn-stop-practice').style.display = 'none';
+    }
+
+    document.getElementById('game-select').addEventListener('change', function() {
+      if (!this.value) return;
+      loadPgn(GAMES[this.value]);
+    });
+
+    // ── Practice mode ─────────────────────────────────────────────────────
+    function startPractice(color) {
+      practiceMode = true;
+      userColor = color;
+      waitingForDecision = false;
+
+      // Reset to start of game
+      chess = new Chess();
+      pgnIndex = 0;
+      lastMove = null;
+      selected = null;
+      legalTargets = [];
+      renderBoard();
+      renderHistory();
+
+      // Hide watch controls, show stop button
+      document.getElementById('watch-controls').style.display = 'none';
+      document.getElementById('btn-play-white').style.display = 'none';
+      document.getElementById('btn-play-black').style.display = 'none';
+      document.getElementById('btn-stop-practice').style.display = '';
+      document.getElementById('practice-status').style.display = 'block';
+      updatePracticeStatus();
+
+      // If user plays black, computer plays white's first move
+      if (color === 'b') {
+        setTimeout(computerMove, 600);
+      }
+    }
+
+    function stopPractice() {
+      practiceMode = false;
+      waitingForDecision = false;
+      document.getElementById('watch-controls').style.display = 'flex';
+      document.getElementById('btn-stop-practice').style.display = 'none';
+      document.getElementById('btn-play-white').style.display = '';
+      document.getElementById('btn-play-black').style.display = '';
+      document.getElementById('practice-status').style.display = 'none';
+      document.getElementById('decision-panel').style.display = 'none';
+    }
+
+    document.getElementById('btn-play-white').addEventListener('click', () => startPractice('w'));
+    document.getElementById('btn-play-black').addEventListener('click', () => startPractice('b'));
+    document.getElementById('btn-stop-practice').addEventListener('click', () => {
+      stopPractice();
+      // Restore watch mode at current position
+      pgnIndex = chess.history().length;
+      updateAutoPlayButtons();
+    });
+
+    // ── Auto-play (watch mode) ────────────────────────────────────────────
+    function stepForward() {
+      if (pgnIndex >= pgnMoves.length) return;
+      const move = chess.move(pgnMoves[pgnIndex]);
+      if (move) {
+        pgnIndex++;
+        lastMove = { from: move.from, to: move.to };
+        renderBoard();
+        renderHistory();
+        showBubble(move.to, move.san);
+      }
+      updateAutoPlayButtons();
+    }
+
+    function stepBack() {
+      if (pgnIndex === 0) return;
+      chess.undo();
+      pgnIndex--;
+      selected = null;
+      legalTargets = [];
+
+      const history = chess.history({ verbose: true });
+      if (history.length > 0) {
+        const prev = history[history.length - 1];
+        lastMove = { from: prev.from, to: prev.to };
+        renderBoard();
+        showBubble(prev.to, prev.san);
+      } else {
+        lastMove = null;
+        renderBoard();
+      }
+      renderHistory();
+      updateAutoPlayButtons();
+    }
+
+    function updateAutoPlayButtons() {
+      const hasPgn = pgnMoves.length > 0;
+      document.getElementById('btn-prev').disabled = !hasPgn || pgnIndex === 0;
+      document.getElementById('btn-next').disabled = !hasPgn || pgnIndex >= pgnMoves.length;
+      document.getElementById('btn-auto').disabled = !hasPgn || pgnIndex >= pgnMoves.length;
+    }
+
+    document.getElementById('btn-prev').addEventListener('click', () => { stopAuto(); stepBack(); });
+    document.getElementById('btn-next').addEventListener('click', () => { stopAuto(); stepForward(); });
+
+    document.getElementById('btn-auto').addEventListener('click', () => {
+      if (autoTimer) { stopAuto(); } else { startAuto(); }
+    });
+
+    document.getElementById('speed-slider').addEventListener('input', function() {
+      const ms = parseInt(this.value);
+      document.getElementById('speed-label').textContent = (ms / 1000).toFixed(1) + 's';
+      if (autoTimer) { stopAuto(); startAuto(); }
+    });
+
+    function getSpeed() { return parseInt(document.getElementById('speed-slider').value); }
+
+    function startAuto() {
+      document.getElementById('btn-auto').textContent = '⏸ Pause';
+      autoTimer = setInterval(() => {
+        if (pgnIndex >= pgnMoves.length) { stopAuto(); return; }
+        stepForward();
+      }, getSpeed());
+    }
+
+    function stopAuto() {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      document.getElementById('btn-auto').textContent = '▶ Play';
+    }
+
+    // ── Reset ─────────────────────────────────────────────────────────────
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      stopAuto();
+      stopPractice();
+      chess = new Chess();
+      pgnMoves = [];
+      pgnIndex = 0;
+      lastMove = null;
+      selected = null;
+      legalTargets = [];
+      document.getElementById('game-select').value = '';
+      document.getElementById('pgn-status').textContent = '';
+      document.getElementById('practice-panel').style.display = 'none';
+      renderBoard();
+      renderHistory();
+      updateAutoPlayButtons();
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    buildBoard();
+    renderBoard();
+    renderHistory();
+  </script>
+</body>
+</html>
