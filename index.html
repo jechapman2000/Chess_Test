@@ -370,10 +370,22 @@
       margin-bottom: 0;
     }
 
+    .captured-color-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      min-width: 38px;
+    }
+
+    .white-label { color: #e0e0e0; }
+    .black-label { color: #888; }
+
     .captured-pieces {
       font-size: 1.3rem;
       letter-spacing: 1px;
       min-height: 1.4em;
+      flex: 1;
     }
 
     .captured-weight {
@@ -412,10 +424,12 @@
       <div id="captured-display" class="captured-display" style="display:none">
         <label>Captured Pieces</label>
         <div class="captured-row">
+          <span class="captured-color-label white-label">White</span>
           <span id="captured-by-white" class="captured-pieces"></span>
           <span id="weight-white" class="captured-weight"></span>
         </div>
         <div class="captured-row">
+          <span class="captured-color-label black-label">Black</span>
           <span id="captured-by-black" class="captured-pieces"></span>
           <span id="weight-black" class="captured-weight"></span>
         </div>
@@ -645,8 +659,9 @@
 
       document.getElementById('captured-by-white').textContent = capturedByWhite.map(p => CAPTURE_ICONS[p] || '?').join('');
       document.getElementById('captured-by-black').textContent = capturedByBlack.map(p => CAPTURE_ICONS[p] || '?').join('');
-      document.getElementById('weight-white').textContent = weightWhite > 0 ? `+${weightWhite}` : '';
-      document.getElementById('weight-black').textContent = weightBlack > 0 ? `+${weightBlack}` : '';
+      const advantage = weightWhite - weightBlack;
+      document.getElementById('weight-white').textContent = weightWhite > 0 ? `${weightWhite}` + (advantage > 0 ? ` (+${advantage})` : '') : '';
+      document.getElementById('weight-black').textContent = weightBlack > 0 ? `${weightBlack}` + (advantage < 0 ? ` (+${Math.abs(advantage)})` : '') : '';
     }
 
     // ── Move history display ──────────────────────────────────────────────
