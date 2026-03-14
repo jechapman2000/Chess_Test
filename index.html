@@ -328,6 +328,19 @@
       overflow-y: auto;
     }
 
+    /* ── Move Count Display ────────────── */
+
+    .move-count-display {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #c9b370;
+      padding: 10px 14px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 8px;
+      text-align: center;
+    }
+
     .move-list .current-move {
       background: #c9b370;
       color: #1a1a2e;
@@ -349,6 +362,9 @@
     </div>
 
     <div class="sidebar">
+      <!-- Move counter -->
+      <div id="move-count-display" class="move-count-display">Moves: 0</div>
+
       <!-- Practice status -->
       <div id="practice-status" style="display:none"></div>
 
@@ -526,8 +542,17 @@
       bubble.addEventListener('animationend', () => bubble.remove());
     }
 
+    // ── Move counter ────────────────────────────────────────────────────
+    function updateMoveCounter() {
+      const halfMoves = chess.history().length;
+      const fullMoves = Math.ceil(halfMoves / 2);
+      const el = document.getElementById('move-count-display');
+      el.textContent = `Moves: ${fullMoves}`;
+    }
+
     // ── Move history display ──────────────────────────────────────────────
     function renderHistory() {
+      updateMoveCounter();
       const history = chess.history();
       const list = document.getElementById('move-list');
       if (history.length === 0) { list.textContent = '—'; return; }
