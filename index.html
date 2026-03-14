@@ -328,9 +328,9 @@
       overflow-y: auto;
     }
 
-    /* ── Move Counter ──────────────────── */
+    /* ── Move Count Display ────────────── */
 
-    .move-counter {
+    .move-count-display {
       font-size: 1rem;
       font-weight: 600;
       color: #c9b370;
@@ -363,7 +363,7 @@
 
     <div class="sidebar">
       <!-- Move counter -->
-      <div id="move-counter" class="move-counter">Moves: 0</div>
+      <div id="move-count-display" class="move-count-display">Moves: 0</div>
 
       <!-- Practice status -->
       <div id="practice-status" style="display:none"></div>
@@ -546,7 +546,7 @@
     function updateMoveCounter() {
       const halfMoves = chess.history().length;
       const fullMoves = Math.ceil(halfMoves / 2);
-      const el = document.getElementById('move-counter');
+      const el = document.getElementById('move-count-display');
       el.textContent = `Moves: ${fullMoves}`;
     }
 
