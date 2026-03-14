@@ -341,6 +341,49 @@
       text-align: center;
     }
 
+    /* ── Captured Pieces Display ─────── */
+
+    .captured-display {
+      padding: 10px 14px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 8px;
+    }
+
+    .captured-display label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .captured-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .captured-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .captured-pieces {
+      font-size: 1.3rem;
+      letter-spacing: 1px;
+      min-height: 1.4em;
+    }
+
+    .captured-weight {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #c9b370;
+      min-width: 20px;
+      text-align: right;
+    }
+
     .move-list .current-move {
       background: #c9b370;
       color: #1a1a2e;
@@ -364,6 +407,19 @@
     <div class="sidebar">
       <!-- Move counter -->
       <div id="move-count-display" class="move-count-display">Moves: 0</div>
+
+      <!-- Captured pieces -->
+      <div id="captured-display" class="captured-display" style="display:none">
+        <label>Captured Pieces</label>
+        <div class="captured-row">
+          <span id="captured-by-white" class="captured-pieces"></span>
+          <span id="weight-white" class="captured-weight"></span>
+        </div>
+        <div class="captured-row">
+          <span id="captured-by-black" class="captured-pieces"></span>
+          <span id="weight-black" class="captured-weight"></span>
+        </div>
+      </div>
 
       <!-- Practice status -->
       <div id="practice-status" style="display:none"></div>
@@ -550,9 +606,53 @@
       el.textContent = `Moves: ${fullMoves}`;
     }
 
+    // ── Captured pieces display ─────────────────────────────────────────
+    const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+    const CAPTURE_ICONS = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛' };
+
+    function updateCapturedPieces() {
+      const history = chess.history({ verbose: true });
+      const container = document.getElementById('captured-display');
+
+      // Gather captured pieces from move history
+      const capturedByWhite = []; // black pieces captured by white
+      const capturedByBlack = []; // white pieces captured by white
+
+      for (const move of history) {
+        if (move.captured) {
+          if (move.color === 'w') {
+            capturedByWhite.push(move.captured);
+          } else {
+            capturedByBlack.push(move.captured);
+          }
+        }
+      }
+
+      if (capturedByWhite.length === 0 && capturedByBlack.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'block';
+
+      // Sort by value (highest first)
+      const sortByValue = (a, b) => (PIECE_VALUES[b] || 0) - (PIECE_VALUES[a] || 0);
+      capturedByWhite.sort(sortByValue);
+      capturedByBlack.sort(sortByValue);
+
+      const weightWhite = capturedByWhite.reduce((sum, p) => sum + (PIECE_VALUES[p] || 0), 0);
+      const weightBlack = capturedByBlack.reduce((sum, p) => sum + (PIECE_VALUES[p] || 0), 0);
+
+      document.getElementById('captured-by-white').textContent = capturedByWhite.map(p => CAPTURE_ICONS[p] || '?').join('');
+      document.getElementById('captured-by-black').textContent = capturedByBlack.map(p => CAPTURE_ICONS[p] || '?').join('');
+      document.getElementById('weight-white').textContent = weightWhite > 0 ? `+${weightWhite}` : '';
+      document.getElementById('weight-black').textContent = weightBlack > 0 ? `+${weightBlack}` : '';
+    }
+
     // ── Move history display ──────────────────────────────────────────────
     function renderHistory() {
       updateMoveCounter();
+      updateCapturedPieces();
       const history = chess.history();
       const list = document.getElementById('move-list');
       if (history.length === 0) { list.textContent = '—'; return; }
