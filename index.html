@@ -402,6 +402,80 @@
       padding: 1px 4px;
       border-radius: 3px;
     }
+
+    /* ── Practice Score Display ─────── */
+
+    .score-display {
+      padding: 10px 14px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+    }
+
+    .score-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .score-item .score-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .score-item .score-label {
+      font-size: 0.65rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .score-correct { color: #4caf50; }
+    .score-wrong { color: #e57373; }
+    .score-total { color: #c9b370; }
+
+    /* ── Step indicators ─────────── */
+
+    .step-guide {
+      font-size: 0.8rem;
+      color: #888;
+      padding: 6px 0;
+    }
+
+    .step-guide .step-number {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+      text-align: center;
+      border-radius: 50%;
+      background: #2a3a5e;
+      color: #c9d3e8;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .step-guide.active .step-number {
+      background: #c9b370;
+      color: #1a1a2e;
+    }
+
+    .step-guide.active {
+      color: #c9b370;
+    }
+
+    .step-guide.done {
+      color: #4caf50;
+    }
+
+    .step-guide.done .step-number {
+      background: #4caf50;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -432,6 +506,22 @@
           <span class="captured-color-label black-label">Black</span>
           <span id="captured-by-black" class="captured-pieces"></span>
           <span id="weight-black" class="captured-weight"></span>
+        </div>
+      </div>
+
+      <!-- Practice score -->
+      <div id="score-display" class="score-display" style="display:none">
+        <div class="score-item">
+          <span id="score-correct" class="score-value score-correct">0</span>
+          <span class="score-label">Correct</span>
+        </div>
+        <div class="score-item">
+          <span id="score-wrong" class="score-value score-wrong">0</span>
+          <span class="score-label">Wrong</span>
+        </div>
+        <div class="score-item">
+          <span id="score-total" class="score-value score-total">0</span>
+          <span class="score-label">Total</span>
         </div>
       </div>
 
@@ -468,8 +558,8 @@
   </div>
 
   <!-- Game selection -->
-  <div class="panel">
-    <label>Select a Game</label>
+  <div class="panel" id="game-panel">
+    <label><span class="step-guide active" id="step1"><span class="step-number">1</span>Select a Game</span></label>
     <select id="game-select">
       <option value="">— choose a game —</option>
       <option value="scholars">Scholar's Mate — quickest checkmate (4 moves)</option>
@@ -484,7 +574,7 @@
 
   <!-- Practice mode: color picker (shown after game is loaded) -->
   <div class="panel" id="practice-panel" style="display:none">
-    <label>Practice Mode — play through the game yourself</label>
+    <label><span class="step-guide active" id="step2"><span class="step-number">2</span>Choose Your Color &amp; Start Playing</span></label>
     <div class="panel-row">
       <button id="btn-play-white" class="primary">Play as White</button>
       <button id="btn-play-black" class="primary">Play as Black</button>
@@ -509,6 +599,8 @@
     let waitingForDecision = false;
     let pendingUserMoveSan = null;   // what the user just played (if wrong)
     let pendingGameMoveSan = null;   // what the game played at that position
+    let scoreCorrect = 0;
+    let scoreWrong = 0;
 
     const FILES = ['a','b','c','d','e','f','g','h'];
     const RANKS = ['8','7','6','5','4','3','2','1'];
@@ -691,18 +783,29 @@
       if (!practiceMode) { el.style.display = 'none'; return; }
 
       el.style.display = 'block';
+      const total = scoreCorrect + scoreWrong;
+      const pct = total > 0 ? Math.round(scoreCorrect / total * 100) : 0;
+
       if (chess.in_checkmate()) {
-        el.innerHTML = 'Checkmate!';
+        el.innerHTML = `<span class="turn-indicator">Checkmate!</span>` +
+          (total > 0 ? ` You got ${scoreCorrect}/${total} moves correct (${pct}%)` : '');
         return;
       }
       if (chess.game_over()) {
-        el.innerHTML = 'Game over.';
+        el.innerHTML = `<span class="turn-indicator">Game over.</span>` +
+          (total > 0 ? ` You got ${scoreCorrect}/${total} moves correct (${pct}%)` : '');
+        return;
+      }
+      if (pgnIndex >= pgnMoves.length) {
+        el.innerHTML = `<span class="turn-indicator">Practice complete!</span>` +
+          (total > 0 ? ` You got ${scoreCorrect}/${total} moves correct (${pct}%)` : '');
         return;
       }
       const isYourTurn = chess.turn() === userColor;
       const colorName = userColor === 'w' ? 'White' : 'Black';
+      const moveNum = Math.floor(pgnIndex / 2) + 1;
       el.innerHTML = isYourTurn
-        ? `<span class="turn-indicator">Your turn (${colorName})</span> — make your move`
+        ? `<span class="turn-indicator">Your turn (${colorName})</span> — move ${moveNum}, make your move`
         : `Opponent is thinking…`;
     }
 
@@ -777,12 +880,20 @@
       }
     }
 
+    function updateScore() {
+      document.getElementById('score-correct').textContent = scoreCorrect;
+      document.getElementById('score-wrong').textContent = scoreWrong;
+      document.getElementById('score-total').textContent = scoreCorrect + scoreWrong;
+    }
+
     function evaluatePracticeMove(move) {
       const gameMove = pgnMoves[pgnIndex]; // what the reference game played here
       pgnIndex++;
 
       if (move.san === gameMove) {
         // Correct!
+        scoreCorrect++;
+        updateScore();
         showBubble(move.to, '✓ ' + move.san, true);
         updatePracticeStatus();
         if (!chess.game_over()) {
@@ -790,6 +901,8 @@
         }
       } else {
         // Different from game — ask user what to do
+        scoreWrong++;
+        updateScore();
         pendingUserMoveSan = move.san;
         pendingGameMoveSan = gameMove;
         showBubble(move.to, move.san);
@@ -895,6 +1008,10 @@
       document.getElementById('btn-play-white').style.display = '';
       document.getElementById('btn-play-black').style.display = '';
       document.getElementById('btn-stop-practice').style.display = 'none';
+
+      // Update step indicators
+      document.getElementById('step1').className = 'step-guide done';
+      document.getElementById('step2').className = 'step-guide active';
     }
 
     document.getElementById('game-select').addEventListener('change', function() {
@@ -907,6 +1024,8 @@
       practiceMode = true;
       userColor = color;
       waitingForDecision = false;
+      scoreCorrect = 0;
+      scoreWrong = 0;
 
       // Reset to start of game
       chess = new Chess();
@@ -917,13 +1036,19 @@
       renderBoard();
       renderHistory();
 
-      // Hide watch controls, show stop button
+      // Hide watch controls, show stop button and score
       document.getElementById('watch-controls').style.display = 'none';
       document.getElementById('btn-play-white').style.display = 'none';
       document.getElementById('btn-play-black').style.display = 'none';
       document.getElementById('btn-stop-practice').style.display = '';
       document.getElementById('practice-status').style.display = 'block';
+      document.getElementById('score-display').style.display = 'flex';
+      updateScore();
       updatePracticeStatus();
+
+      // Update step indicators
+      document.getElementById('step1').className = 'step-guide done';
+      document.getElementById('step2').className = 'step-guide done';
 
       // If user plays black, computer plays white's first move
       if (color === 'b') {
@@ -940,6 +1065,11 @@
       document.getElementById('btn-play-black').style.display = '';
       document.getElementById('practice-status').style.display = 'none';
       document.getElementById('decision-panel').style.display = 'none';
+      document.getElementById('score-display').style.display = 'none';
+
+      // Reset step indicators
+      document.getElementById('step1').className = 'step-guide active';
+      document.getElementById('step2').className = 'step-guide active';
     }
 
     document.getElementById('btn-play-white').addEventListener('click', () => startPractice('w'));
@@ -1035,6 +1165,8 @@
       document.getElementById('game-select').value = '';
       document.getElementById('pgn-status').textContent = '';
       document.getElementById('practice-panel').style.display = 'none';
+      document.getElementById('score-display').style.display = 'none';
+      document.getElementById('step1').className = 'step-guide active';
       renderBoard();
       renderHistory();
       updateAutoPlayButtons();
